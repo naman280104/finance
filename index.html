@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Finances</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>💰 My Finances</h1>
+    <label class="hdr-toggle" title="When on, transactions dated before an account's opening date are hidden everywhere — balances, dashboards, net worth and the Transactions list (still kept in the database). Turn off to include every transaction.">
+      <input type="checkbox" id="opt-respect-open"> Respect opening dates
+    </label>
+    <div class="nw">
+      <div class="label">Net Worth</div>
+      <div class="val-row">
+        <span class="val" id="hdr-networth">₹0</span>
+        <button id="eye-toggle" class="eye" title="Show/hide amounts">👁</button>
+      </div>
+    </div>
+  </header>
+  <nav id="nav">
+    <button data-view="dashboard" class="active">Dashboard</button>
+    <button data-view="transactions">Transactions</button>
+    <button data-view="import">Import</button>
+    <button data-view="payslips">Payslips</button>
+    <button data-view="accounts">Accounts</button>
+    <button data-view="investments">Investments</button>
+    <button data-view="tax">Tax</button>
+    <button data-view="rules">Rules</button>
+  </nav>
+  <main>
+
+    <!-- DASHBOARD -->
+    <section id="dashboard" class="view active">
+      <div class="row">
+        <div class="field">
+          <label>Month</label>
+          <select id="dash-month"></select>
+        </div>
+      </div>
+      <div class="cards" id="dash-cards"></div>
+      <div class="panel">
+        <h2>Income by category</h2>
+        <div id="dash-income-cats"></div>
+      </div>
+      <div class="panel">
+        <h2>Spending by category</h2>
+        <div id="dash-cats"></div>
+      </div>
+      <div class="panel">
+        <h2>Income vs Expense — last 12 months</h2>
+        <div class="trend" id="dash-trend"></div>
+        <div class="legend">
+          <span><span class="dot" style="background:var(--green)"></span>Income</span>
+          <span><span class="dot" style="background:var(--red)"></span>Expense</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- TRANSACTIONS -->
+    <section id="transactions" class="view">
+      <div class="panel">
+        <h2>Add transaction</h2>
+        <div class="row">
+          <div class="field"><label>Date</label><input type="date" id="t-date"></div>
+          <div class="field"><label>Account</label><select id="t-account"></select></div>
+          <div class="field"><label>Amount (₹, − for spend)</label><input type="number" id="t-amount" step="0.01" placeholder="-1200"></div>
+          <div class="field"><label>Description</label><input type="text" id="t-desc" placeholder="Swiggy dinner"></div>
+          <div class="field"><label>Category</label><input type="text" id="t-cat" list="catlist" placeholder="Food"></div>
+          <div class="field"><label>Type</label>
+            <select id="t-type"><option value="">(auto)</option><option>income</option><option>expense</option><option>transfer</option></select>
+          </div>
+          <button class="btn" id="t-add">Add</button>
+        </div>
+        <datalist id="catlist"></datalist>
+      </div>
+      <div class="panel">
+        <div class="row">
+          <div class="field" style="flex:1; min-width:200px"><label>Search</label><input type="text" id="f-search" placeholder="Search description…"></div>
+          <div class="field"><label>Month</label><select id="f-month"><option value="">All</option></select></div>
+          <div class="field"><label>Account</label><select id="f-account"><option value="">All</option></select></div>
+          <div class="field"><label>Category</label><select id="f-category"><option value="">All</option></select></div>
+          <div class="field"><label>Type</label><select id="f-type"><option value="">All</option><option>income</option><option>expense</option><option>transfer</option></select></div>
+        </div>
+        <table>
+          <thead><tr><th>Date</th><th>Account</th><th>Description</th><th>Category</th><th>Type</th><th class="num">Amount</th><th></th></tr></thead>
+          <tbody id="txn-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- IMPORT -->
+    <section id="import" class="view">
+      <div class="panel">
+        <h2>1. Choose statement file (CSV or Excel)</h2>
+        <p class="hint">Download a statement from your bank or card as <b>CSV, XLS, or XLSX</b>. It's parsed entirely in your browser — nothing is uploaded anywhere. <b>Password-protected Excel files</b> are supported — you'll be prompted to unlock them. For PDF-only statements, use the CSV/Excel export option in net-banking instead.</p>
+        <div class="row">
+          <div class="field"><label>Into account</label><select id="imp-account"></select></div>
+          <div class="field"><label>File</label><input type="file" id="imp-file" accept=".csv,.txt,.xls,.xlsx"></div>
+        </div>
+        <p class="hint" id="imp-account-warn" style="display:none; color:var(--amber)"></p>
+      </div>
+      <div class="panel" id="imp-map-panel" style="display:none">
+        <h2>2. Map columns</h2>
+        <p class="hint">Many bank CSVs have a few junk rows on top (name, address, statement period). The <b>header row</b> below is auto-detected — check the preview and adjust if the column names look wrong.</p>
+        <div style="max-height:180px; overflow:auto; margin-bottom:12px; border:1px solid var(--border); border-radius:8px">
+          <table id="imp-raw"></table>
+        </div>
+        <div class="row">
+          <div class="field"><label>Header row</label><input type="number" id="map-headerrow" min="1" value="1" class="mini" style="width:70px"></div>
+          <div class="field"><label>Date column</label><select id="map-date"></select></div>
+          <div class="field"><label>Date format</label>
+            <select id="map-datefmt">
+              <option value="auto">Auto-detect</option>
+              <option value="dmy">DD/MM/YYYY</option>
+              <option value="dmy2">DD-MM-YYYY</option>
+              <option value="dMonY">DD-Mon-YYYY (01-Aug-2025)</option>
+              <option value="ymd">YYYY-MM-DD</option>
+              <option value="mdy">MM/DD/YYYY</option>
+            </select>
+          </div>
+          <div class="field"><label>Description column</label><select id="map-desc"></select></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Amount style</label>
+            <select id="map-style">
+              <option value="split">Separate Debit &amp; Credit columns</option>
+              <option value="single">Single Amount column</option>
+              <option value="single_drcr">Amount + Dr/Cr indicator column (credit cards)</option>
+              <option value="single_inline">Single Amount with Dr/Cr in the value (e.g. "999 Dr.")</option>
+            </select>
+          </div>
+          <div class="field" data-style="split"><label>Debit (money out)</label><select id="map-debit"></select></div>
+          <div class="field" data-style="split"><label>Credit (money in)</label><select id="map-credit"></select></div>
+          <div class="field" data-style="single single_drcr single_inline" style="display:none"><label>Amount column</label><select id="map-amount"></select></div>
+          <div class="field" data-style="single" style="display:none"><label>Sign</label>
+            <select id="map-sign">
+              <option value="asis">As-is (+in / −out)</option>
+              <option value="flip">Flip (statement shows spend as +)</option>
+            </select>
+          </div>
+          <div class="field" data-style="single_drcr" style="display:none"><label>Dr/Cr column</label><select id="map-drcr"></select></div>
+          <div class="field" data-style="single_drcr single_inline" style="display:none"><label>Default when blank</label>
+            <select id="map-drcr-default">
+              <option value="dr">Debit (spend, minus) — credit cards</option>
+              <option value="cr">Credit (money in, plus)</option>
+            </select>
+          </div>
+          <button class="btn" id="imp-preview">Preview →</button>
+        </div>
+        <p class="hint" id="imp-rawinfo"></p>
+      </div>
+      <div class="panel" id="imp-preview-panel" style="display:none">
+        <h2>3. Review &amp; import</h2>
+        <p class="hint" id="imp-summary"></p>
+        <div style="max-height:360px; overflow:auto">
+          <table>
+            <thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Type</th><th class="num">Amount</th><th>Status</th></tr></thead>
+            <tbody id="imp-body"></tbody>
+          </table>
+        </div>
+        <div class="row" style="margin-top:16px">
+          <label class="muted"><input type="checkbox" id="imp-skipdupe" checked> Skip duplicates</label>
+          <button class="btn" id="imp-commit">Import transactions</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- PAYSLIPS -->
+    <section id="payslips" class="view">
+      <div class="panel">
+        <h2>Add / paste payslip</h2>
+        <p class="hint">Paste your payslip text below and click <b>Auto-fill</b> — it best-effort extracts common fields, which you then verify. Or just type them in. Feeds income tracking and the Tax estimator.</p>
+        <div class="row">
+          <textarea id="ps-paste" rows="3" placeholder="Paste payslip text here (optional)" style="flex:1; min-width:280px"></textarea>
+          <button class="btn ghost" id="ps-autofill">Auto-fill ↴</button>
+        </div>
+        <div class="row">
+          <div class="field"><label>Month</label><input type="month" id="ps-month"></div>
+          <div class="field"><label>Employer</label><input type="text" id="ps-employer" placeholder="Company name"></div>
+          <div class="field"><label>Basic</label><input type="number" id="ps-basic"></div>
+          <div class="field"><label>HRA</label><input type="number" id="ps-hra"></div>
+          <div class="field"><label>Allowances</label><input type="number" id="ps-allow"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Gross (or leave blank = basic+hra+allow)</label><input type="number" id="ps-gross"></div>
+          <div class="field"><label>PF</label><input type="number" id="ps-pf"></div>
+          <div class="field"><label>Professional tax</label><input type="number" id="ps-pt"></div>
+          <div class="field"><label>TDS (income tax)</label><input type="number" id="ps-tds"></div>
+          <div class="field"><label>Other deductions</label><input type="number" id="ps-other"></div>
+          <button class="btn" id="ps-add">Save payslip</button>
+        </div>
+      </div>
+      <div class="panel">
+        <table>
+          <thead><tr><th>Month</th><th>Employer</th><th class="num">Gross</th><th class="num">TDS</th><th class="num">Net pay</th><th></th></tr></thead>
+          <tbody id="ps-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ACCOUNTS -->
+    <section id="accounts" class="view">
+      <div class="panel">
+        <h2>Analysis setting</h2>
+        <p class="hint"><b>Respect opening dates</b> (toggle in the top bar): when on, transactions dated <i>before</i> an account's opening date are hidden everywhere — excluded from balances, dashboards, net worth, and the Transactions list. They remain in the database (turn the toggle off to see and count them again). Turn it off to include every transaction regardless of date.</p>
+      </div>
+      <div class="panel">
+        <h2>Add account</h2>
+        <div class="row">
+          <div class="field"><label>Name</label><input type="text" id="a-name" placeholder="HDFC Savings"></div>
+          <div class="field"><label>Type</label>
+            <select id="a-type"><option value="bank">Bank</option><option value="credit_card">Credit card</option><option value="cash">Cash</option></select>
+          </div>
+          <div class="field"><label>Opening balance (₹)</label><input type="number" id="a-open" step="0.01" placeholder="0"></div>
+          <div class="field"><label>As of date</label><input type="date" id="a-date"></div>
+          <div class="field"><label>Statement identifier (optional)</label><input type="text" id="a-id" placeholder="e.g. 6014 or SBIN0006823"></div>
+          <button class="btn" id="a-add">Add</button>
+        </div>
+        <p class="hint">For a credit card, enter opening balance as a negative number if you owed money on that date (e.g. −15000). <b>Statement identifier:</b> a bit of text that appears in this account's statements (last 4 digits of the account/card number, or its IFSC) — used at import time to warn you if a file doesn't match the chosen account.</p>
+      </div>
+      <div class="panel">
+        <table>
+          <thead><tr><th>Account</th><th>Type</th><th>Statement ID</th><th class="num">Opening</th><th class="num">Current balance</th><th></th></tr></thead>
+          <tbody id="acct-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- INVESTMENTS -->
+    <section id="investments" class="view">
+      <div class="panel">
+        <h2>Import Groww holdings (CSV)</h2>
+        <p class="hint">In Groww → Stocks/Mutual funds → export/download your <b>holdings</b> as CSV. This replaces all Groww-imported holdings with the latest file (your manually-added FDs are untouched). No login — you export, this reads the file locally.</p>
+        <div class="row">
+          <div class="field"><label>File</label><input type="file" id="gh-file" accept=".csv,.txt,.xls,.xlsx"></div>
+        </div>
+        <div id="gh-map" style="display:none">
+          <p class="hint">Groww files have Personal Details / Summary rows on top — set the <b>Header row</b> to the line with the actual column names (Stock Name, Quantity, Current Value…).</p>
+          <div style="max-height:160px; overflow:auto; margin-bottom:10px; border:1px solid var(--border); border-radius:8px"><table id="gh-raw"></table></div>
+          <div class="row">
+            <div class="field"><label>Header row</label><input type="number" id="gh-headerrow" min="1" value="1" class="mini" style="width:70px"></div>
+          </div>
+          <div class="row">
+            <div class="field"><label>Name / Symbol</label><select id="gh-name"></select></div>
+            <div class="field"><label>Invested / Buy value</label><select id="gh-invested"></select></div>
+            <div class="field"><label>Current value</label><select id="gh-current"></select></div>
+            <div class="field"><label>Quantity (optional)</label><select id="gh-qty"></select></div>
+            <div class="field"><label>Type</label><select id="gh-type"><option value="stock">Stocks</option><option value="mf">Mutual Fund</option></select></div>
+            <button class="btn" id="gh-preview">Preview →</button>
+          </div>
+          <p class="hint" id="gh-info"></p>
+          <div id="gh-preview-panel" style="display:none; margin-top:12px">
+            <p class="hint" id="gh-summary"></p>
+            <div style="max-height:300px; overflow:auto">
+              <table>
+                <thead><tr><th>Name</th><th>Type</th><th class="num">Invested</th><th class="num">Current</th><th class="num">Gain</th></tr></thead>
+                <tbody id="gh-preview-body"></tbody>
+              </table>
+            </div>
+            <button class="btn" id="gh-commit" style="margin-top:12px">Import holdings (replaces existing Groww holdings)</button>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Add investment</h2>
+        <div class="row">
+          <div class="field"><label>Type</label>
+            <select id="i-type"><option value="fd">Fixed Deposit</option><option value="stock">Stocks</option><option value="mf">Mutual Fund</option><option value="other">Other</option></select>
+          </div>
+          <div class="field"><label>Name</label><input type="text" id="i-name" placeholder="SBI FD / Zerodha portfolio"></div>
+          <div class="field"><label>Invested (₹)</label><input type="number" id="i-invested" step="0.01"></div>
+          <div class="field"><label>Current value (₹)</label><input type="number" id="i-current" step="0.01"></div>
+          <div class="field"><label>Rate % (FD)</label><input type="number" id="i-rate" step="0.01"></div>
+          <div class="field"><label>Maturity</label><input type="date" id="i-maturity"></div>
+          <button class="btn" id="i-add">Add</button>
+        </div>
+      </div>
+      <div class="panel">
+        <table>
+          <thead><tr><th>Name</th><th>Type</th><th class="num">Invested</th><th class="num">Current</th><th class="num">Gain</th><th>Maturity</th><th></th></tr></thead>
+          <tbody id="inv-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TAX -->
+    <section id="tax" class="view">
+      <div class="row">
+        <div class="field"><label>Financial year</label>
+          <select id="tax-fy"><option value="2025-26">FY 2025-26</option><option value="2026-27">FY 2026-27</option><option value="2024-25">FY 2024-25</option></select>
+        </div>
+      </div>
+      <div class="cards" id="tax-cards"></div>
+      <div class="panel">
+        <h2>Old vs New regime</h2>
+        <table id="tax-compare">
+          <thead><tr><th>Component</th><th class="num">New regime</th><th class="num">Old regime</th></tr></thead>
+          <tbody id="tax-compare-body"></tbody>
+        </table>
+        <p class="hint" id="tax-note"></p>
+      </div>
+      <div class="panel">
+        <h2>Deductions &amp; overrides (old regime uses these)</h2>
+        <p class="hint">Saved locally. Salary defaults to the sum of your payslips for the FY; override only if needed.</p>
+        <div class="row">
+          <div class="field"><label>Annual gross override</label><input type="number" id="tx-gross" placeholder="(from payslips)"></div>
+          <div class="field"><label>TDS override</label><input type="number" id="tx-tds" placeholder="(from payslips)"></div>
+          <div class="field"><label>80C (max 1.5L)</label><input type="number" id="tx-80c"></div>
+          <div class="field"><label>80D (health ins.)</label><input type="number" id="tx-80d"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>HRA exemption</label><input type="number" id="tx-hra"></div>
+          <div class="field"><label>Home loan interest (max 2L)</label><input type="number" id="tx-hli"></div>
+          <div class="field"><label>Other deductions</label><input type="number" id="tx-other"></div>
+          <button class="btn" id="tx-save">Save &amp; recompute</button>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Import Groww capital gains statement (CSV)</h2>
+        <p class="hint">In Groww → download your <b>Capital Gains statement</b> (CSV/Excel) for the year. Feeds STCG/LTCG into the tax estimate. Term is auto-classified (equity held &gt; 12 months = LTCG) if the file doesn't say.</p>
+        <div class="row"><div class="field"><label>File</label><input type="file" id="cg-file" accept=".csv,.txt,.xls,.xlsx"></div></div>
+        <div id="cg-map" style="display:none">
+          <p class="hint">Set the <b>Header row</b> to the line with the actual column names, skipping any summary rows on top.</p>
+          <div style="max-height:160px; overflow:auto; margin-bottom:10px; border:1px solid var(--border); border-radius:8px"><table id="cg-raw"></table></div>
+          <div class="row">
+            <div class="field"><label>Header row</label><input type="number" id="cg-headerrow" min="1" value="1" class="mini" style="width:70px"></div>
+          </div>
+          <div class="row">
+            <div class="field"><label>Symbol</label><select id="cg-symbol"></select></div>
+            <div class="field"><label>Buy date</label><select id="cg-buydate"></select></div>
+            <div class="field"><label>Sell date</label><select id="cg-selldate"></select></div>
+            <div class="field"><label>Date format</label>
+              <select id="cg-datefmt"><option value="auto">Auto</option><option value="dmy">DD/MM/YYYY</option><option value="dMonY">DD-Mon-YYYY</option><option value="ymd">YYYY-MM-DD</option></select>
+            </div>
+          </div>
+          <div class="row">
+            <div class="field"><label>Buy value</label><select id="cg-buyval"></select></div>
+            <div class="field"><label>Sell value</label><select id="cg-sellval"></select></div>
+            <div class="field"><label>Gain (optional)</label><select id="cg-gain"></select></div>
+            <button class="btn" id="cg-preview">Preview →</button>
+          </div>
+          <p class="hint" id="cg-info"></p>
+          <div id="cg-preview-panel" style="display:none; margin-top:12px">
+            <p class="hint" id="cg-summary"></p>
+            <div style="max-height:300px; overflow:auto">
+              <table>
+                <thead><tr><th>Symbol</th><th>Buy</th><th>Sell</th><th>Term</th><th class="num">Gain</th></tr></thead>
+                <tbody id="cg-preview-body"></tbody>
+              </table>
+            </div>
+            <button class="btn" id="cg-commit" style="margin-top:12px">Import gains</button>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Realized capital gains</h2>
+        <table>
+          <thead><tr><th>Symbol</th><th>Buy</th><th>Sell</th><th>Term</th><th class="num">Gain</th><th></th></tr></thead>
+          <tbody id="cg-body"></tbody>
+        </table>
+      </div>
+      <p class="hint">⚠️ Estimate only, per Union Budget 2025 (FY 2025-26). Ignores marginal relief, employer-NPS 80CCD(2), and the LTCG surcharge cap. Verify on the income-tax portal before filing — not tax advice.</p>
+    </section>
+
+    <!-- RULES -->
+    <section id="rules" class="view">
+      <div class="panel">
+        <h2>Auto-categorization rules</h2>
+        <p class="hint">If a transaction description contains the text, it gets this category (and optional type). Whitespace differences are ignored. Rules are tried <b>top to bottom — the first match wins</b>, so use ▲▼ to set precedence. Applied on every import; click "Apply to all existing" to retro-categorize. "Used" shows how many transactions each rule currently owns.</p>
+        <div class="row">
+          <div class="field"><label>If description contains</label><input type="text" id="r-pattern" placeholder="SWIGGY"></div>
+          <div class="field"><label>Category</label><input type="text" id="r-cat" list="catlist" placeholder="Food"></div>
+          <div class="field"><label>Type (optional)</label>
+            <select id="r-type"><option value="">(auto by sign)</option><option>income</option><option>expense</option><option>transfer</option></select>
+          </div>
+          <button class="btn" id="r-add">Add rule</button>
+          <button class="btn ghost" id="r-apply">Apply to all existing</button>
+          <button class="btn ghost" id="r-reset">Reset all to Uncategorized</button>
+        </div>
+      </div>
+      <div class="panel">
+        <table>
+          <thead><tr><th>Order</th><th>Contains</th><th>Category</th><th>Type</th><th class="num">Used</th><th></th></tr></thead>
+          <tbody id="rule-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+  <div class="toast" id="toast"></div>
+  <script src="xlsx.full.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
